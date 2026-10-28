@@ -1,0 +1,24 @@
+# Format only handwritten TypeScript modules and tests.
+**/*
+!src/
+!src/**/
+!src/**/*.ts
+!test/
+!test/**/
+!test/**/*.ts
+
+# Explicit exclusions also protect future generated files and infrastructure.
+**/node_modules/
+**/dist/
+**/build/
+**/coverage/
+**/Dockerfile*
+**/*.Dockerfile
+**/.dockerignore
+**/*.yaml
+**/*.yml
+**/*.json
+**/*.md
+**/*.sql
+**/.env*
+**/*.log

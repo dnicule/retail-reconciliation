@@ -1,0 +1,21 @@
+services:
+  update-api:
+    image: retailer-update-api:local
+    build:
+      context: .
+    restart: unless-stopped
+    env_file:
+      - path: .env.docker
+        format: raw
+    environment:
+      HOST: 0.0.0.0
+      PORT: "43187"
+    ports:
+      - "127.0.0.1:${UPDATE_API_HOST_PORT:-43187}:43187"
+    stop_grace_period: 25s
+
+# All local services share this independently managed network.
+networks:
+  default:
+    external: true
+    name: glue-local

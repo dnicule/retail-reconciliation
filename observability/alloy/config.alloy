@@ -1,0 +1,80 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+// Discover containers on this Docker engine.
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+}
+
+// Define labeling rules, applied by the Docker log source below.
+discovery.relabel "container_logs" {
+  targets = []
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    replacement   = "$1"
+    target_label  = "container_name"
+  }
+
+  // Use the container name when no Compose service name exists.
+  rule {
+    source_labels = ["container_name"]
+    target_label  = "service_name"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "(.+)"
+    target_label  = "service_name"
+  }
+
+  rule {
+    target_label = "compose_project"
+    replacement  = "standalone"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = "(.+)"
+    target_label  = "compose_project"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+}
+
+// Read stdout/stderr through Docker's API.
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.containers.targets
+  relabel_rules = discovery.relabel.container_logs.rules
+  forward_to    = [loki.process.container_logs.receiver]
+
+  labels = {
+    host        = sys.env("HOST_ID"),
+    environment = sys.env("ENVIRONMENT"),
+  }
+}
+
+// Skip historical entries outside our 30-day retention window.
+loki.process "container_logs" {
+  forward_to = [loki.write.local.receiver]
+
+  stage.drop {
+    older_than          = "720h"
+    drop_counter_reason = "older_than_retention"
+  }
+}
+
+// Send the collected logs to Loki over the Compose network.
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

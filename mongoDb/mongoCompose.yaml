@@ -1,0 +1,23 @@
+name: mongodb
+
+services:
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      # Attach this volume to the MongoDB container:
+      - mongo-data:/data/db
+
+      # Attach an existing folder from your Mac:
+      - ./imports:/imports:ro
+
+# Declare the named volume that Compose should manage:
+volumes:
+  mongo-data:
+
+networks:
+  default:
+    external: true
+    name: glue-local

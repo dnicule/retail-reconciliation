@@ -1,0 +1,104 @@
+name: docker-observability
+
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  loki:
+    container_name: observability-loki-1
+    image: grafana/loki:3.7.9
+    restart: unless-stopped
+    stop_grace_period: 1m
+    command:
+      - -config.file=/etc/loki/config.yaml
+    ports:
+      - "127.0.0.1:${LOKI_PORT:-52630}:3100"
+    volumes:
+      - type: bind
+        source: ./loki/config.yaml
+        target: /etc/loki/config.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+      - loki-data:/loki
+    logging: *default-logging
+
+  alloy:
+    container_name: observability-alloy-1
+    image: grafana/alloy:v1.21.2
+    restart: unless-stopped
+    stop_grace_period: 30s
+    user: "0:0"
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    environment:
+      HOST_ID: "${HOST_ID:-mac-local}"
+      ENVIRONMENT: "${ENVIRONMENT:-dev}"
+    ports:
+      - "127.0.0.1:${ALLOY_PORT:-49497}:12345"
+    volumes:
+      - type: bind
+        source: ./alloy/config.alloy
+        target: /etc/alloy/config.alloy
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
+        target: /var/run/docker.sock
+        read_only: true
+        bind:
+          create_host_path: false
+      - alloy-data:/var/lib/alloy/data
+    depends_on:
+      loki:
+        condition: service_started
+    logging: *default-logging
+
+  grafana:
+    container_name: observability-grafana-1
+    image: grafana/grafana:13.2.4
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "http://localhost:${GRAFANA_PORT:-55028}/"
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-55028}:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - type: bind
+        source: ./grafana/provisioning
+        target: /etc/grafana/provisioning
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./grafana/dashboards
+        target: /var/lib/grafana/dashboards
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      loki:
+        condition: service_started
+    logging: *default-logging
+
+volumes:
+  loki-data:
+  alloy-data:
+  grafana-data:
+
+# Keep the project name above to reuse its existing data volumes.
+networks:
+  default:
+    external: true
+    name: glue-local

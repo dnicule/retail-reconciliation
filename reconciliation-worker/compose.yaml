@@ -1,0 +1,16 @@
+services:
+  reconciliation-worker:
+    image: retailer-reconciliation-worker:local
+    build:
+      context: .
+    restart: unless-stopped
+    env_file:
+      - path: .env.docker
+        format: raw
+    stop_grace_period: 30s
+
+# Reuse the shared local network; databases are managed by their existing projects.
+networks:
+  default:
+    external: true
+    name: glue-local
