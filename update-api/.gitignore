@@ -1,0 +1,10 @@
+node_modules/
+dist/
+#would ignore in real projects
+#.env
+#would be ignored in real projects
+#.env.docker
+.env.example
+.env.docker.example
+*.log
+.vscode
